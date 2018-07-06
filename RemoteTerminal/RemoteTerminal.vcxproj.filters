@@ -24,6 +24,12 @@
     <ClInclude Include="targetver.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="RequestHandler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="dll\microhttpd.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -32,5 +38,15 @@
     <ClCompile Include="RemoteTerminal.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="RequestHandler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="dll\libmicrohttpd-dll.dll" />
+    <None Include="dll\libmicrohttpd-dll.exp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="dll\libmicrohttpd-dll.lib" />
   </ItemGroup>
 </Project>
