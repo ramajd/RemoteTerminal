@@ -4,10 +4,15 @@
 #include <thread>
 
 #include "mongoose.h"
+#include "Observer.h"
 
 using namespace std;
 
-class RequestHandler
+struct mg_mgr;
+struct mg_connection;
+
+
+class RequestHandler: public SubjectBase
 {
 private: 
 	string			m_portName;

@@ -1,8 +1,8 @@
-#include "stdafx.h"
+#include "stdafx.h"	
 #include "RequestHandler.h"
 
-#include <iostream>
-#include <thread>
+#include "mongoose.h"
+#include "utils.h"
 
 
 RequestHandler::RequestHandler(const char* port) : m_running(false)
@@ -44,29 +44,17 @@ void RequestHandler::Stop()
 	m_thread.join();
 }
 
-
-#define GUID_FORMAT "%08lX-%04hX-%04hX-%02hhX%02hhX-%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX"
-#define GUID_ARG(guid) guid.Data1, guid.Data2, guid.Data3, guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3], guid.Data4[4], guid.Data4[5], guid.Data4[6], guid.Data4[7]
-
-
 void RequestHandler::HandleRequest(mg_connection* conn, int evnt, void* evtdata)
 {
 	if (evnt == MG_EV_HTTP_REQUEST)
 	{
-		GUID guid;
-		char strGuid[100] = { 0x00 };
-		CoCreateGuid(&guid);
-		sprintf_s(strGuid, GUID_FORMAT, GUID_ARG(guid));
-		cout << strGuid << endl;
-
+		auto strGUID = CreateGUIDString();
 		http_message hm;
-		hm.message = mg_mk_str(strGuid);
+		hm.message = mg_mk_str(strGUID.c_str());
 
 		mg_send_head(conn, 200, hm.message.len, NULL);
 		mg_printf(conn, "%.*s", hm.message.len, hm.message.p);
 
-		//http_message *hm = (http_message*)evtdata;
-		//mg_send_head(conn, 200, hm->message.len, "Content-Type: application/json");
-		//mg_printf(conn, "%.*s", hm->message.len, hm->message.p);
+		this->Notify((void*)strGUID.c_str());
 	}
 }
