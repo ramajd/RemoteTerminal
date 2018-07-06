@@ -79,6 +79,7 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="application_types.h" />
     <ClInclude Include="mongoose.h" />
     <ClInclude Include="Observer.h" />
     <ClInclude Include="RequestHandler.h" />
