@@ -1,38 +1,52 @@
 #pragma once
 
-#include <microhttpd.h>
+#include <string>
+#include <thread>
+#include <map>
 
-class RequestHandler
+#include "mongoose.h"
+#include "json/json.h"
+#include "Observer.h"
+#include "application_types.h"
+
+
+using namespace std;
+
+struct mg_mgr;
+struct mg_connection;
+
+class RequestHandler: public SubjectBase
 {
-private:
-	uint16_t	m_port;
-	MHD_Daemon* m_pDeamon;
+private: 
+	string			m_portName;
+	mg_mgr			m_manager;
+	mg_connection*	m_connection;
+	thread			m_thread;
+	bool			m_running;
+
+	map<string, ActionObject_T*> m_command_dict;
+
+	Json::CharReader* m_reader;
+
+
 
 public:
-	RequestHandler(uint16_t port);
+	RequestHandler(const char* port);
 	~RequestHandler();
 
-	bool Start();
+	void Start();
 	void Stop();
 
 protected:
-	int HandleRequest(void* cls,
-		MHD_Connection* connection,
-		const char* url,
-		const char* method,
-		const char* version,
-		const char* upload_data,
-		size_t* upload_data_size,
-		void** ptr);
+	void HandleRequest(mg_connection* conn, int evnt, void* pdata);
 
+	//bool ParseCommand(string data, ActionObject_T* cmd); 
+	
+	void HandleGetCommandStatus(mg_connection* conn, string id);
+	void HandlePostCommandRequest(mg_connection* conn, string body);
 
-	static int testme(void* cls,
-		MHD_Connection* connection,
-		const char* url,
-		const char* method,
-		const char* version,
-		const char* upload_data,
-		size_t * upload_data_size,
-		void** ptr);
+	void SendResponse(mg_connection* conn, int statusCode, string response, bool isJson = false);
+	void SendBadRequestResponse(mg_connection* conn);
+	void SendNotFoundResponse(mg_connection* conn);
 };
 

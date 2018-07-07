@@ -1,105 +1,151 @@
-#include "stdafx.h"
+#include "stdafx.h"	
 #include "RequestHandler.h"
 
-#include <iostream>
-#include <functional>
-
-#define PAGE	""	\
-	"<html>" \
-	"<head><title>Remote Terminal API Docs</title></head>" \
-	"<body>" \
-	"	<h1>Remote Terminal API Docs:</h1>" \
-	"	<hr>" \
-	"	<ul>" \
-	"		<li> [POST] /exec</li>" \
-	"		" \
-	"		" \
-	"		" \
-	"	</ul>" \
-	"</body>" \
-	"</html>"
+#include "mongoose.h"
+#include "json/json.h"
+#include "utils.h"
 
 
-RequestHandler::RequestHandler(uint16_t port)
+RequestHandler::RequestHandler(const char* port) : m_running(false)
 {
-	m_port = port;
+	m_portName = port;
+	mg_mgr_init(&m_manager, NULL);
+
+	Json::CharReaderBuilder builder;
+	m_reader = builder.newCharReader();
 }
 
 
 RequestHandler::~RequestHandler()
 {
+	this->Stop();
+	mg_mgr_free(&m_manager);
+	
+	delete m_reader;
+	for (auto cmd : m_command_dict)
+	{
+		if (cmd.second != NULL)
+			delete cmd.second;
+	}
+	m_command_dict.clear();
 }
 
-bool RequestHandler::Start()
+
+void RequestHandler::Start()
 {
-	this->Stop();
-	m_pDeamon = MHD_start_daemon(
-		MHD_USE_THREAD_PER_CONNECTION,
-		m_port,
-		NULL, NULL,
-		[](void* cls, MHD_Connection* conn, const char* url, const char* method, const char* version,
-			const char* upload_data, size_t* upload_data_size, void** con_cls) -> int {
-			auto self = (RequestHandler*)cls;
-			return self->HandleRequest(cls, conn, url, method, version, upload_data, upload_data_size, con_cls);
-		},
-		(void*)this,
-		MHD_OPTION_END);
-	return m_pDeamon != NULL;
+	m_connection = mg_bind(&m_manager, m_portName.c_str(), [](mg_connection *c, int ev, void* evdata) {
+		auto instance = static_cast<RequestHandler*>(c->user_data);
+		instance->HandleRequest(c, ev, evdata);
+	});
+	m_connection->user_data = (void*)this;
+	mg_set_protocol_http_websocket(m_connection);
+	m_running = true;
+
+	m_thread = thread([](void* param){
+		auto instance = static_cast<RequestHandler*>(param);
+		while (instance->m_running)
+		{
+			mg_mgr_poll(&instance->m_manager, 1000);
+		}
+	}, this);
 }
 
 void RequestHandler::Stop()
 {
-	if (m_pDeamon != NULL)
+	m_running = false;
+	m_thread.join();
+}
+
+void RequestHandler::HandleRequest(mg_connection* conn, int evnt, void* evtdata)
+{
+	if (evnt == MG_EV_HTTP_REQUEST)
 	{
-		MHD_stop_daemon(m_pDeamon);
-		m_pDeamon = NULL;
+		auto req = (struct http_message *) evtdata;
+		char method[20] = { 0x00 };
+		sprintf_s(method, "%.*s", req->method.len, req->method.p);
+
+		if (strcmp(method, "GET") == 0)
+		{
+			cout << "NEW GET: ";
+			char id[100] = { 0x00 };
+			mg_get_http_var(&req->query_string, "id", id, 100);
+			HandleGetCommandStatus(conn, id);
+			//cout << "ID: " << id << endl;
+		}
+		else if (strcmp(method, "POST") == 0)
+		{
+			cout << "NEW POST: " << endl;
+			char body[200] = { 0x00 };
+			sprintf_s(body, "%.*s", req->body.len, req->body.p);
+			HandlePostCommandRequest(conn, body);
+		}
+		else
+		{
+			cout << "INVALID METHOD: " << method << endl;
+			SendBadRequestResponse(conn);
+		}
 	}
 }
 
-int RequestHandler::HandleRequest(void* cls,
-	MHD_Connection* connection,
-	const char* url,
-	const char* method,
-	const char* version,
-	const char* upload_data,
-	size_t * upload_data_size,
-	void** ptr)
+
+
+void RequestHandler::HandlePostCommandRequest(mg_connection* conn, string body)
 {
-	static int dummy;
-	const char* page = "WELCOME TO TEST";
-	MHD_Response* response; 
-	int ret;
+	Json::Value root;
+	std::string errors;
+	ActionObject_T* cmd = NULL;
 
-	std::cout << "NEW [" << method << "] From [" << url << "] Version ["
-		<< version << "]" << std::endl;
-
-	const MHD_ConnectionInfo *inf = MHD_get_connection_info(connection, MHD_CONNECTION_INFO_CLIENT_ADDRESS);
-	std::cout << "\t - " << inet_ntoa(((sockaddr_in*)inf->client_addr)->sin_addr) << std::endl;
-
-
-	MHD_get_connection_values(connection, MHD_HEADER_KIND, [](void* cls, enum MHD_ValueKind kind, const char* key, const char* val) ->int {
-		std::cout << "\t - " << key << " -> " << val << std::endl;
-		return MHD_YES;
-	}, NULL);
-
-	if (strcmp(method, "GET") == 0)
+	if (!m_reader->parse(body.c_str(), body.c_str() + body.size(), &root, &errors))
 	{
-		if (&dummy != *ptr)
-		{
-			*ptr = &dummy;
-			return MHD_YES;
-		}
-		if (*upload_data_size != 0)
-		{
-			return MHD_NO;
-		}
-		*ptr = NULL;
-		response = MHD_create_response_from_buffer(strlen(PAGE),
-			(void*)PAGE, MHD_RESPMEM_PERSISTENT);
-		ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
-		MHD_destroy_response(response);
-		return ret;
+		cout << "ERROR: " << __func__ << " - " << errors << endl;
+		SendBadRequestResponse(conn);
 	}
-	return MHD_NO;
+	else if (!root.isMember("cmd"))
+	{
+		cout << "ERROR: " << __func__ << " - cmd param not found"  << endl; 
+		SendBadRequestResponse(conn);
+	}
+	else
+	{
+		cmd = new ActionObject_T();
+		cmd->id = CreateGUIDString();
+		cmd->cmd = root.get("cmd", "").asString();
+		cmd->shell_id = root.get("shell", CreateGUIDString()).asString();
+		SendResponse(conn, 200, cmd->AsJsonString(), true);
+		m_command_dict[cmd->id] = cmd;
+		this->Notify(cmd);
+	}
+}
 
+void RequestHandler::HandleGetCommandStatus(mg_connection* conn, string id)
+{
+	if (m_command_dict.find(id) != m_command_dict.end())
+	{
+		SendResponse(conn, 200, m_command_dict[id]->AsJsonString(), true);
+	}
+	else
+	{
+		SendNotFoundResponse(conn);
+	}
+}
+
+void RequestHandler::SendResponse(mg_connection* conn, int statusCode, string response, bool isJson)
+{
+	http_message msg;
+	msg.message = mg_mk_str(response.c_str());
+	if (isJson)
+		mg_send_head(conn, statusCode, msg.message.len, "Content-Type: application/json");
+	else 
+		mg_send_head(conn, statusCode, msg.message.len, NULL);
+	mg_printf(conn, "%.*s", msg.message.len, msg.message.p);
+}
+
+void RequestHandler::SendBadRequestResponse(mg_connection* conn)
+{
+	SendResponse(conn, 400, "Bad Request");
+}
+
+void RequestHandler::SendNotFoundResponse(mg_connection* conn)
+{
+	SendResponse(conn, 400, "Not Found");
 }
