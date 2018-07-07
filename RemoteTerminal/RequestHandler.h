@@ -5,9 +5,8 @@
 #include <map>
 
 #include "mongoose.h"
-#include "json/json.h"
 #include "Observer.h"
-#include "application_types.h"
+#include "ActionObject.h"
 
 
 using namespace std;
@@ -24,11 +23,7 @@ private:
 	thread			m_thread;
 	bool			m_running;
 
-	map<string, ActionObject_T*> m_command_dict;
-
-	Json::CharReader* m_reader;
-
-
+	map<string, ActionObject*> m_actionList;
 
 public:
 	RequestHandler(const char* port);
@@ -37,10 +32,11 @@ public:
 	void Start();
 	void Stop();
 
+	virtual void AddObserver(ObserverBase* observer);
+	virtual void Notify(void* data);
+
 protected:
 	void HandleRequest(mg_connection* conn, int evnt, void* pdata);
-
-	//bool ParseCommand(string data, ActionObject_T* cmd); 
 	
 	void HandleGetCommandStatus(mg_connection* conn, string id);
 	void HandlePostCommandRequest(mg_connection* conn, string body);

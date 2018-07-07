@@ -39,14 +39,20 @@
     <ClInclude Include="Observer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="application_types.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="json\json.h">
       <Filter>Header Files\json</Filter>
     </ClInclude>
     <ClInclude Include="json\json-forwards.h">
       <Filter>Header Files\json</Filter>
+    </ClInclude>
+    <ClInclude Include="ActionRunner.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ActionObject.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ShellObject.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -63,6 +69,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="jsoncpp.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ActionRunner.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ActionObject.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ShellObject.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="RequestHandler.cpp">
