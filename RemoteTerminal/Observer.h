@@ -6,8 +6,9 @@ using namespace std;
 
 class ObserverBase
 {
-public:
-	virtual void Update(void* data) = 0;
+	friend class SubjectBase;
+protected:
+	virtual void OnNotify(void* data) = 0;
 };
 
 class SubjectBase
@@ -22,16 +23,16 @@ public:
 		m_observers.clear();
 	}
 
-	void Subscribe(ObserverBase& observer)
+	void AddObserver(ObserverBase* observer)
 	{
-		m_observers.push_back(&observer);
+		m_observers.push_back(observer);
 	}
 
-	void UnSubscribe(ObserverBase& observer)
+	void RemoveObserver(ObserverBase* observer)
 	{
 		for (auto it = m_observers.begin(); it != m_observers.end(); it++) 
 		{
-			if (*it == &observer)
+			if (*it == observer)
 			{
 				m_observers.remove(*it);
 				break;
@@ -42,7 +43,7 @@ public:
 	void Notify(void* data)
 	{
 		for (auto obs : m_observers) 
-			obs->Update(data);
+			obs->OnNotify(data);
 	}
 	
 };

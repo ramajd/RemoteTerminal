@@ -97,12 +97,12 @@ void RequestHandler::HandlePostCommandRequest(mg_connection* conn, string body)
 
 	if (!m_reader->parse(body.c_str(), body.c_str() + body.size(), &root, &errors))
 	{
-		cout << "ERROR: " << __func__ << " - " << errors << endl;
+		cout << "ERROR: " << __FUNCTION__ << " - " << errors << endl;
 		SendBadRequestResponse(conn);
 	}
 	else if (!root.isMember("cmd"))
 	{
-		cout << "ERROR: " << __func__ << " - cmd param not found"  << endl; 
+		cout << "ERROR: " << __FUNCTION__ << " - cmd param not found" << endl;
 		SendBadRequestResponse(conn);
 	}
 	else
