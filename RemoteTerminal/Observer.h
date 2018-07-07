@@ -1,6 +1,8 @@
 #pragma once
 
-#include <list>
+#include <vector>
+#include <map>
+#include <string>
 
 using namespace std;
 
@@ -8,13 +10,13 @@ class ObserverBase
 {
 	friend class SubjectBase;
 protected:
-	virtual void OnNotify(void* data) = 0;
+	virtual void OnNotify(string topic, void* data) = 0;
 };
 
 class SubjectBase
 {
 private:	
-	list<ObserverBase*> m_observers; 
+	map<string, vector<ObserverBase*> > m_observers;
 
 public:
 	SubjectBase() {}
@@ -23,27 +25,36 @@ public:
 		m_observers.clear();
 	}
 
-	void AddObserver(ObserverBase* observer)
+	virtual void AddObserver(string topic, ObserverBase* observer)
 	{
-		m_observers.push_back(observer);
+		m_observers[topic].push_back(observer);
 	}
 
-	void RemoveObserver(ObserverBase* observer)
+	virtual void RemoveObserver(string topic, ObserverBase* observer)
 	{
-		for (auto it = m_observers.begin(); it != m_observers.end(); it++) 
+		if (m_observers.find(topic) != m_observers.end())
 		{
-			if (*it == observer)
+			auto obslist = m_observers[topic];
+			for (auto it = obslist.begin(); it != obslist.end(); it++)
 			{
-				m_observers.remove(*it);
-				break;
+				if (*it = observer)
+				{
+					obslist.erase(it);
+					break;
+				}
 			}
 		}
 	}
 
-	void Notify(void* data)
+	void Notify(string topic, void* data)
 	{
-		for (auto obs : m_observers) 
-			obs->OnNotify(data);
+		if (m_observers.find(topic) != m_observers.end())
+		{
+			for (auto obs : m_observers[topic])
+			{
+				obs->OnNotify(topic, data);
+			}
+		}
 	}
 	
 };

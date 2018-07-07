@@ -1,18 +1,14 @@
 #include "stdafx.h"	
 #include "RequestHandler.h"
 
+#include <iostream>
 #include "mongoose.h"
-#include "json/json.h"
-#include "utils.h"
 
 
 RequestHandler::RequestHandler(const char* port) : m_running(false)
 {
 	m_portName = port;
 	mg_mgr_init(&m_manager, NULL);
-
-	Json::CharReaderBuilder builder;
-	m_reader = builder.newCharReader();
 }
 
 
@@ -21,13 +17,12 @@ RequestHandler::~RequestHandler()
 	this->Stop();
 	mg_mgr_free(&m_manager);
 	
-	delete m_reader;
-	for (auto cmd : m_command_dict)
+	for (auto act : m_actionList)
 	{
-		if (cmd.second != NULL)
-			delete cmd.second;
+		if (act.second != NULL)
+			delete act.second;
 	}
-	m_command_dict.clear();
+	m_actionList.clear();
 }
 
 
@@ -70,7 +65,7 @@ void RequestHandler::HandleRequest(mg_connection* conn, int evnt, void* evtdata)
 			char id[100] = { 0x00 };
 			mg_get_http_var(&req->query_string, "id", id, 100);
 			HandleGetCommandStatus(conn, id);
-			//cout << "ID: " << id << endl;
+			cout << "ID: " << id << endl;
 		}
 		else if (strcmp(method, "POST") == 0)
 		{
@@ -91,37 +86,24 @@ void RequestHandler::HandleRequest(mg_connection* conn, int evnt, void* evtdata)
 
 void RequestHandler::HandlePostCommandRequest(mg_connection* conn, string body)
 {
-	Json::Value root;
-	std::string errors;
-	ActionObject_T* cmd = NULL;
-
-	if (!m_reader->parse(body.c_str(), body.c_str() + body.size(), &root, &errors))
+	ActionObject* act = ActionObject::NewFromJsonString(body);
+	if (act != NULL)
 	{
-		cout << "ERROR: " << __FUNCTION__ << " - " << errors << endl;
-		SendBadRequestResponse(conn);
-	}
-	else if (!root.isMember("cmd"))
-	{
-		cout << "ERROR: " << __FUNCTION__ << " - cmd param not found" << endl;
-		SendBadRequestResponse(conn);
+		SendResponse(conn, 200, act->ToJSONString(), true);
+		m_actionList[act->id] = act;
+		this->Notify(act);
 	}
 	else
 	{
-		cmd = new ActionObject_T();
-		cmd->id = CreateGUIDString();
-		cmd->cmd = root.get("cmd", "").asString();
-		cmd->shell_id = root.get("shell", CreateGUIDString()).asString();
-		SendResponse(conn, 200, cmd->AsJsonString(), true);
-		m_command_dict[cmd->id] = cmd;
-		this->Notify(cmd);
+		SendBadRequestResponse(conn);
 	}
 }
 
 void RequestHandler::HandleGetCommandStatus(mg_connection* conn, string id)
 {
-	if (m_command_dict.find(id) != m_command_dict.end())
+	if (m_actionList.find(id) != m_actionList.end())
 	{
-		SendResponse(conn, 200, m_command_dict[id]->AsJsonString(), true);
+		SendResponse(conn, 200, m_actionList[id]->ToJSONString(), true);
 	}
 	else
 	{
@@ -148,4 +130,14 @@ void RequestHandler::SendBadRequestResponse(mg_connection* conn)
 void RequestHandler::SendNotFoundResponse(mg_connection* conn)
 {
 	SendResponse(conn, 400, "Not Found");
+}
+
+
+void RequestHandler::AddObserver(ObserverBase* observer)
+{
+	SubjectBase::AddObserver("new_action", observer);
+}
+void RequestHandler::Notify(void* data)
+{
+	SubjectBase::Notify("new_action", data);
 }
